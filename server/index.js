@@ -166,7 +166,7 @@ app.post(['/gsi', '/', '/gsi/dota', '/gsi/cs2'], (req, res) => {
   if (CONFIG.requireToken) {
     const token = body.auth && body.auth.token;
     if (token !== CONFIG.token) {
-      console.warn('[gsi] отклонён пакет с токеном:', token);
+      warnRejected(req, body, token);
       return res.status(403).end();
     }
   }
@@ -179,6 +179,39 @@ app.post(['/gsi', '/', '/gsi/dota', '/gsi/cs2'], (req, res) => {
   if (!target) return;
   target.ingest(body);
 });
+
+/**
+ * Пакет с чужим токеном или без него. Пишем, откуда он: какая игра (по provider
+ * и User-Agent — Valve подписывает его номером игры: 570 — Dota 2, 730 — CS2),
+ * на какой адрес и с какого компьютера. Одна строка на источник раз в 10 секунд,
+ * со счётчиком — иначе 10 пакетов в секунду засыпают всё окно.
+ */
+const rejected = new Map();
+let rejectHintShown = false;
+function warnRejected(req, body, token) {
+  const ua = String(req.get('user-agent') || '');
+  const appid = Number(body.provider && body.provider.appid) || Number((ua.match(/\((\d+)\)/) || [])[1]) || 0;
+  const game = appid === 570 ? 'Dota 2' : appid === 730 ? 'CS2'
+    : body.provider && body.provider.name ? body.provider.name
+    : ua ? `неизвестно (${ua.slice(0, 60)})` : 'неизвестно';
+  const ip = String(req.ip || '').replace(/^::ffff:/, '');
+  const key = `${game}|${req.path}|${ip}|${token}`;
+  const now = Date.now();
+  const r = rejected.get(key) || { at: 0, count: 0 };
+  r.count += 1;
+  rejected.set(key, r);
+  if (now - r.at < 10000) return;
+  const tokenText = token === undefined ? 'нет токена (в .cfg нет блока "auth")' : `токен «${token}» (нужен «${CONFIG.token}»)`;
+  console.warn(`[gsi] отклонено ${r.count} пак.: ${tokenText} · игра: ${game} · адрес: ${req.path} · от: ${ip || '?'}`);
+  r.at = now;
+  r.count = 0;
+  if (!rejectHintShown) {
+    rejectHintShown = true;
+    console.warn('      Скорее всего, в папке cfg игры лежит ещё один gamestate_integration_*.cfg (от другого HUD),');
+    console.warn('      который тоже шлёт данные на этот порт. Оставьте там только gamestate_integration_arena.cfg из config/');
+    console.warn('      (Dota: ...\\dota 2 beta\\game\\dota\\cfg\\gamestate_integration\\, CS2: ...\\game\\csgo\\cfg\\).');
+  }
+}
 
 app.get('/api/state', (req, res) => {
   const game = gameOf(req);
