@@ -79,7 +79,8 @@ function defaults() {
       sides: { aStart: 'CT' },    // за какую сторону команда A начинает карту
       panels: {
         players: true, observed: true, economy: true, roundResult: true,
-        killfeed: false, rounds: false, stats: false
+        killfeed: false, rounds: false, stats: false,
+        radar: true, radarNades: true
       }
     },
     ads: {

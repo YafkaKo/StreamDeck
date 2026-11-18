@@ -179,6 +179,12 @@ function renderGame() {
     $('castersSep').hidden = !(cs.left && cs.right);
   }
 
+  // Радар
+  const showRadar = !!g && p.radar !== false && !p.stats;
+  if (typeof Radar !== 'undefined') Radar.update(g, showRadar, p.radarNades !== false);
+  document.body.classList.toggle('has-radar', showRadar && !$('radar').hidden);
+  document.body.classList.toggle('has-radar-lower', showRadar && typeof Radar !== 'undefined' && Radar.lowerShown());
+
   // Бегущая строка
   $('ticker').hidden = !control.ticker;
   text($('tickerText'), control.ticker || '');

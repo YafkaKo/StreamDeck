@@ -4,6 +4,7 @@
 window.CS2_MAPS = [
   ['de_ancient', 'Ancient'],
   ['de_anubis', 'Anubis'],
+  ['de_cache', 'Cache'],
   ['de_dust2', 'Dust II'],
   ['de_inferno', 'Inferno'],
   ['de_mirage', 'Mirage'],

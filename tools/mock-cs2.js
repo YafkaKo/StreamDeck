@@ -66,6 +66,85 @@ const players = [...NICKS_A, ...NICKS_B].map((name, i) => ({
   bomb: false
 }));
 
+// ------------------------------------------------------------- движение по карте (для радара)
+
+// Точки берём из калибровки радара: спавны и пленты в долях картинки.
+const RADAR = (() => {
+  try {
+    const all = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'public', 'assets', 'radar', 'maps.json'), 'utf8')).maps;
+    return all[MAP.split('/').pop().toLowerCase()] || null;
+  } catch { return null; }
+})();
+// Какие точки на нижнем этаже (для карт с двумя уровнями)
+const LOWER_POINTS = { de_nuke: ['bombB'] };
+const RUN = 230;                 // единиц мира в секунду
+
+function world(name) {
+  if (!RADAR || !RADAR.points[name]) return [0, 0, 0];
+  const [fx, fy] = RADAR.points[name];
+  const px = RADAR.scale * (RADAR.sourceSize || 1024);
+  const lower = (LOWER_POINTS[MAP] || []).includes(name);
+  const z = RADAR.lower ? RADAR.lower.below + (lower ? -150 : 150) : 0;
+  return [RADAR.posX + fx * px, RADAR.posY - fy * px, z];
+}
+const jitter = (pt, r) => [pt[0] + (rnd() - 0.5) * 2 * r, pt[1] + (rnd() - 0.5) * 2 * r, pt[2]];
+const SITES = ['bombA', 'bombB'];
+let attackSite = 'bombA';
+let bombPos = null;
+let nades = [];
+let nadeId = 0;
+let nadeTimer = 5;
+
+function placeAtSpawn(p) {
+  p.pos = jitter(world(p.team === 'CT' ? 'CTSpawn' : 'TSpawn'), 140);
+  p.target = null;
+  p.yaw = rnd() * 360;
+}
+
+function chooseTarget(p) {
+  if (bomb.state === 'planted' || bomb.state === 'defusing') return jitter(bombPos || world(attackSite), 260);
+  if (p.team === 'T') return jitter(world(rnd() < 0.8 ? attackSite : pick(SITES)), 320);
+  return jitter(world(pick(SITES)), 380);
+}
+
+function move(dt) {
+  for (const p of players) {
+    if (p.hp <= 0 || !p.pos) continue;
+    if (!p.target || rnd() < 0.002) p.target = chooseTarget(p);
+    const dx = p.target[0] - p.pos[0], dy = p.target[1] - p.pos[1];
+    const d = Math.hypot(dx, dy);
+    if (d < 30) { p.yaw += (rnd() - 0.5) * 40; if (rnd() < 0.01) p.target = chooseTarget(p); continue; }
+    const k = Math.min(1, (RUN * dt) / d);
+    p.pos = [p.pos[0] + dx * k, p.pos[1] + dy * k, d < 400 ? p.target[2] : p.pos[2]];
+    p.yaw = Math.atan2(dy, dx) * 180 / Math.PI;
+  }
+}
+
+function throwNade(dt) {
+  nades = nades.filter(n => (n.left -= dt) > 0);
+  for (const n of nades) if (n.type === 'smoke' && n.fly > 0) {
+    n.fly -= dt;
+    const t = Math.max(0, n.fly) / 1.2;
+    n.pos = [n.to[0] + (n.from[0] - n.to[0]) * t, n.to[1] + (n.from[1] - n.to[1]) * t, n.to[2]];
+  }
+  if ((nadeTimer -= dt) > 0) return;
+  nadeTimer = 3 + rnd() * 6;
+  const who = pick([...alive('CT'), ...alive('T')]);
+  if (!who) return;
+  const to = jitter(world(rnd() < 0.7 ? attackSite : pick(SITES)), 450);
+  if (rnd() < 0.6) nades.push({ id: ++nadeId, owner: who.steamid, type: 'smoke', from: who.pos, to, pos: who.pos, fly: 1.2, left: 19.2 });
+  else nades.push({ id: ++nadeId, owner: who.steamid, type: 'inferno', left: 7, flames: Array.from({ length: 7 }, () => jitter(to, 90)) });
+}
+
+function nadesJson() {
+  const out = {};
+  for (const n of nades) {
+    if (n.type === 'smoke') out[n.id] = { owner: n.owner, type: 'smoke', position: n.pos.map(v => v.toFixed(1)).join(', '), velocity: '0, 0, 0', lifetime: '1.0', effecttime: n.fly > 0 ? '0.0' : (18 - n.left).toFixed(1) };
+    else out[n.id] = { owner: n.owner, type: 'inferno', lifetime: '1.0', flames: Object.fromEntries(n.flames.map((f, i) => [`flame_${i}`, f.map(v => v.toFixed(1)).join(', ')])) };
+  }
+  return out;
+}
+
 let ctScore = 0, tScore = 0;
 let ctLosses = 0, tLosses = 0;
 const roundWins = {};
@@ -133,6 +212,10 @@ function startFreeze() {
   carrier.bomb = true;
   bomb = { state: 'carried', player: carrier.steamid };
   eventTimer = 3 + rnd() * 3;
+  for (const p of players) placeAtSpawn(p);
+  attackSite = pick(SITES);
+  bombPos = null;
+  nades = [];
 }
 
 function buy() {
@@ -217,7 +300,7 @@ function kill() {
   killer.roundDmg += victim.hp;
   victim.hp = 0;
   victim.deaths++;
-  if (victim.bomb) { victim.bomb = false; bomb = { state: 'dropped', player: null }; }
+  if (victim.bomb) { victim.bomb = false; bomb = { state: 'dropped', player: null }; bombPos = victim.pos; }
   if (defusing === victim.steamid) { defusing = null; bomb.state = 'planted'; }
   // помощь
   if (rnd() < 0.35) {
@@ -249,6 +332,8 @@ function step(dt) {
     if (phaseLeft <= 0) { phase = 'live'; phaseLeft = 115; }
   } else if (phase === 'live' || phase === 'bomb' || phase === 'defuse') {
     eventTimer -= dt;
+    move(dt);
+    throwNade(dt);
 
     // упавшую бомбу подбирает кто-то из живых Т
     if (bomb.state === 'dropped' && rnd() < 0.03 && alive('T').length) {
@@ -269,6 +354,8 @@ function step(dt) {
       else if (planting <= 0) {
         carrier.bomb = false;
         carrier.score += 2;
+        bombPos = carrier.pos;
+        for (const p of players) p.target = null;
         bomb = { state: 'planted', player: null, countdown: 40 };
         phase = 'bomb';
         phaseLeft = 40;
@@ -376,8 +463,8 @@ function playerJson(p) {
     },
     match_stats: { kills: p.kills, assists: p.assists, deaths: p.deaths, mvps: p.mvps, score: p.score },
     weapons: p.hp > 0 ? weapons(p) : {},
-    position: `${Math.floor(rnd() * 2000 - 1000)}, ${Math.floor(rnd() * 2000 - 1000)}, 0`,
-    forward: '1, 0, 0'
+    position: (p.pos || [0, 0, 0]).map(v => v.toFixed(2)).join(', '),
+    forward: `${Math.cos((p.yaw || 0) * Math.PI / 180).toFixed(3)}, ${Math.sin((p.yaw || 0) * Math.PI / 180).toFixed(3)}, 0`
   };
 }
 
@@ -405,13 +492,16 @@ function packet() {
     } : undefined,
     player: obs ? { steamid: obs.steamid, ...playerJson(obs), activity: 'playing' } : { steamid: '76561198000000099', name: 'Observer', activity: 'playing' },
     allplayers: all,
+    grenades: nadesJson(),
     phase_countdowns: {
       phase: countdownPhase,
       phase_ends_in: (bomb.state === 'defusing' ? Math.max(0, bomb.defuseLeft) : Math.max(0, phaseLeft)).toFixed(1)
     },
     bomb: {
       state: bomb.state,
-      position: '0, 0, 0',
+      position: (bomb.state === 'carried' || bomb.state === 'planting'
+        ? (players.find(p => p.steamid === bomb.player) || {}).pos || [0, 0, 0]
+        : bombPos || [0, 0, 0]).map(v => v.toFixed(2)).join(', '),
       ...(bomb.player ? { player: bomb.player } : {}),
       ...(bomb.state === 'planted' || bomb.state === 'defusing' ? { countdown: Math.max(0, bomb.countdown || 0).toFixed(1) } : {}),
       ...(bomb.state === 'planting' ? { countdown: Math.max(0, planting).toFixed(1) } : {}),

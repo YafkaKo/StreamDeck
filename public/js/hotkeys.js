@@ -36,7 +36,8 @@ const HOTKEYS = {
     { key: 'KeyR', label: 'Alt+R', action: 'toggle-stats', title: 'Таблица игроков' },
     { key: 'KeyM', label: 'Alt+M', action: 'toggle-rounds', title: 'История раундов' },
     { key: 'KeyB', label: 'Alt+B', action: 'toggle-economy', title: 'Экономика в закупку' },
-    { key: 'KeyL', label: 'Alt+L', action: 'toggle-killfeed', title: 'Своя лента убийств' }
+    { key: 'KeyL', label: 'Alt+L', action: 'toggle-killfeed', title: 'Своя лента убийств' },
+    { key: 'KeyG', label: 'Alt+G', action: 'toggle-radar', title: 'Радар' }
   ]
 };
 

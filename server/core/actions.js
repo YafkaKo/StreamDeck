@@ -94,7 +94,8 @@ function buildActions({ state, change, games, ads, pickFx }) {
   // ---------------------------------------------------------------- CS2
   const c = () => state.s.cs2;
   for (const [key, title] of [['stats', 'Таблица игроков'], ['rounds', 'История раундов'], ['economy', 'Экономика'],
-    ['killfeed', 'Своя лента убийств'], ['players', 'Карточки игроков'], ['observed', 'Игрок в камере'], ['roundResult', 'Итог раунда']]) {
+    ['killfeed', 'Своя лента убийств'], ['players', 'Карточки игроков'], ['observed', 'Игрок в камере'], ['roundResult', 'Итог раунда'],
+    ['radar', 'Радар'], ['radarNades', 'Гранаты на радаре']]) {
     toggle(`toggle-${key}`, title, ['cs2'], () => c().panels[key], (v) => { c().panels[key] = v; });
   }
   add('sides-swap', 'Поменять стороны CT/T', ['cs2'], () => { games.cs2.swapSides(); });

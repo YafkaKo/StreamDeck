@@ -33,6 +33,20 @@
 <!-- ============================ ИГРОВОЙ СЛОЙ ============================ -->
 <div class="layer layer-game" id="layerGame">
 
+  <!-- Радар (Alt+G): карта, игроки, бомба, гранаты -->
+  <div class="radar" id="radar" hidden>
+    <div class="radar__view">
+      <img class="radar__map" alt="">
+      <div class="radar__marks"></div>
+      <span class="radar__label"></span>
+    </div>
+    <div class="radar__lower" hidden>
+      <img class="radar__lower-map" alt="">
+      <div class="radar__lower-marks"></div>
+      <span class="radar__lower-tag">нижний уровень</span>
+    </div>
+  </div>
+
   <!-- Табло: команды, счёт, таймер раунда / таймер бомбы -->
   <header class="board" id="board">
     <div class="board__team board__team--a" id="boardA">
@@ -196,6 +210,7 @@
 <div class="nodata" id="nodata" hidden>ждём данные из CS2 — запустите игру как наблюдатель или имитатор</div>
 
 <script src="js/maps.js?v=20261102"></script>
+<script src="js/radar.js?v=20261118"></script>
 <script src="js/overlay.js?v=20261102"></script>
 </body>
 </html>

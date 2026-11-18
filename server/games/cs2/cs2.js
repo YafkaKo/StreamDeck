@@ -91,6 +91,53 @@ function mapLabel(name) {
 
 function flip(side) { return side === 'CT' ? 'T' : 'CT'; }
 
+/** "123.4, -56.7, 8.9" → [123.4, -56.7, 8.9] (координаты из GSI приходят строкой) */
+function vec(s) {
+  if (!s) return null;
+  const v = String(s).split(',').map(Number);
+  return v.length >= 3 && v.every(Number.isFinite) ? [v[0], v[1], v[2]] : null;
+}
+
+/** Взгляд игрока: forward "x, y, z" → угол на радаре в градусах (0 — вправо, против часовой). */
+function yawOf(forward) {
+  const f = vec(forward);
+  return f ? Math.round(Math.atan2(f[1], f[0]) * 180 / Math.PI) : null;
+}
+
+/** de_mirage, workshop/123/de_cache → de_cache */
+function mapKey(name) {
+  return String(name || '').split('/').pop().toLowerCase();
+}
+
+const NADE_TYPES = { smoke: 'smoke', inferno: 'fire', firebomb: 'fire', molotov: 'fire', incgrenade: 'fire', flashbang: 'flash', frag: 'he', decoy: 'decoy' };
+
+/**
+ * Гранаты для радара (в .cfg нужен "allgrenades" "1"):
+ *   smoke — дым (пока летит — точка, раскрылся — облако), fire — огонь (точки пламени),
+ *   flash / he / decoy — летящая граната.
+ */
+function grenadeList(raw, players) {
+  const out = [];
+  const sideOf = (id) => (players.find((p) => p.steamid === String(id)) || {}).side || null;
+  for (const [id, g] of Object.entries(raw || {})) {
+    const type = NADE_TYPES[String(g.type || '').toLowerCase()];
+    if (!type) continue;
+    const item = { id, type, side: sideOf(g.owner) };
+    if (type === 'fire') {
+      const flames = Object.values(g.flames || {}).map(vec).filter(Boolean).map(([x, y, z]) => [Math.round(x), Math.round(y), Math.round(z)]);
+      if (!flames.length) continue;
+      item.flames = flames;
+    } else {
+      const pos = vec(g.position);
+      if (!pos) continue;
+      item.pos = pos.map(Math.round);
+      item.deployed = type === 'smoke' && Number(g.effecttime) > 0;
+    }
+    out.push(item);
+  }
+  return out;
+}
+
 // Номер «половины» для раунда (нумерация раундов с 1).
 // MR12: 1–12, 13–24, затем овертаймы по 6 раундов, половины по 3.
 function halfIndex(round) {
@@ -274,7 +321,7 @@ class Cs2Match {
     return {
       at: now,
       live: ids.length > 0,
-      map: { name: mapName, label: mapLabel(mapName), phase: map.phase || '' },
+      map: { name: mapName, key: mapKey(mapName), label: mapLabel(mapName), phase: map.phase || '' },
       phase,                        // warmup | freezetime | live | bomb | defuse | over | timeout_ct | timeout_t | paused | gameover
       roundPhase,
       round: currentRound,
@@ -286,6 +333,7 @@ class Cs2Match {
       b: team('B', bSide),
       observed: observedId,
       bomb,
+      grenades: grenadeList(gsi.grenades, players),
       result,
       rounds: this.roundList(completed),
       killfeed: this.killfeed.slice(-6)
@@ -416,7 +464,10 @@ class Cs2Match {
       grenades,
       hasBomb,
       taser,
-      observed: id === observedId
+      observed: id === observedId,
+      // для радара: позиция в мире и направление взгляда
+      pos: (() => { const v = vec(raw.position); return v ? v.map(Math.round) : null; })(),
+      yaw: yawOf(raw.forward)
     };
   }
 
@@ -524,7 +575,9 @@ class Cs2Match {
     }
 
     const explode = this.plantedAt ? Math.max(0, this.plantedLeft - (now - this.plantedAt) / 1000) : null;
-    const out = { state, explodeLeft: explode, explodeTotal: 40, carrier: null, defuser: null, defuseLeft: null, defuseTotal: null, planter: null, plantLeft: null };
+    const bpos = vec(b.position);
+    const out = { state, explodeLeft: explode, explodeTotal: 40, carrier: null, defuser: null, defuseLeft: null, defuseTotal: null, planter: null, plantLeft: null,
+      pos: bpos ? bpos.map(Math.round) : null };
 
     const byId = id => players.find(p => p.steamid === id);
     if (state === 'carried' && b.player) out.carrier = byId(b.player)?.name || null;

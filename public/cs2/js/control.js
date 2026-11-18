@@ -405,9 +405,9 @@ $('sampleBracket').onclick = () => {
 // Alt+буква, а не F-клавиши: F-клавиши заняты OBS и самой игрой.
 // Alt+E, Alt+F и Alt+D не используем — в Chrome они открывают меню и адресную строку.
 const SCENE_KEYS = { Digit1: 'auto', Digit2: 'starting', Digit3: 'break', Digit4: 'bracket', Digit5: 'results', Digit6: 'scoreboard', Digit7: 'veto', Digit0: 'blank' };
-const TOGGLE_KEYS = { KeyH: 'hud', KeyR: 'stats', KeyM: 'rounds', KeyB: 'economy', KeyK: 'casters', KeyT: 'trivia', KeyC: 'countdown', KeyL: 'killfeed' };
-const TOGGLE_NAMES = { hud: 'Вся графика', stats: 'Таблица игроков', rounds: 'История раундов', economy: 'Экономика', casters: 'Комментаторы', trivia: 'Trivia', countdown: 'Таймер', killfeed: 'Лента убийств' };
-const TOGGLE_PATHS = { hud: 'showHud', stats: 'panels.stats', rounds: 'panels.rounds', economy: 'panels.economy', casters: 'casters.show', trivia: 'trivia.show', countdown: 'countdown.show', killfeed: 'panels.killfeed' };
+const TOGGLE_KEYS = { KeyH: 'hud', KeyR: 'stats', KeyM: 'rounds', KeyB: 'economy', KeyK: 'casters', KeyT: 'trivia', KeyC: 'countdown', KeyL: 'killfeed', KeyG: 'radar' };
+const TOGGLE_NAMES = { hud: 'Вся графика', stats: 'Таблица игроков', rounds: 'История раундов', economy: 'Экономика', casters: 'Комментаторы', trivia: 'Trivia', countdown: 'Таймер', killfeed: 'Лента убийств', radar: 'Радар' };
+const TOGGLE_PATHS = { hud: 'showHud', stats: 'panels.stats', rounds: 'panels.rounds', economy: 'panels.economy', casters: 'casters.show', trivia: 'trivia.show', countdown: 'countdown.show', killfeed: 'panels.killfeed', radar: 'panels.radar' };
 
 document.addEventListener('keydown', (e) => {
   if (window.HUD_EMBEDDED) return;   // внутри общего пульта хоткеи обрабатывает он

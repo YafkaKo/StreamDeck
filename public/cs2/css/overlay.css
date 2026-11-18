@@ -751,6 +751,117 @@ body.has-ticker { --lift: 40px; }
 .cd[data-pos="center"] .cd__label { font-size: 18px; }
 .cd[data-pos="center"] .cd__time  { font-size: 96px; }
 
+/* ======================================================= РАДАР (Alt+G) */
+
+.radar {
+  position: absolute; z-index: 6;
+  top: var(--edge); left: var(--edge);
+  width: 320px; height: 320px;
+  filter: drop-shadow(0 16px 30px rgba(0,0,0,.45));
+  animation: radarIn .35s ease-out;
+}
+@keyframes radarIn { from { opacity: 0; transform: translateX(-16px); } }
+.radar__view {
+  position: absolute; inset: 0; overflow: hidden;
+  background: var(--glass);
+  box-shadow: inset 0 0 0 1px var(--line);
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%);
+}
+.radar__map { position: absolute; left: 0; top: 0; transform-origin: 0 0; max-width: none; opacity: .92; }
+.radar__marks, .radar__lower-marks { position: absolute; inset: 0; }
+.radar__label {
+  position: absolute; left: 10px; bottom: 8px;
+  font-size: 12px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--muted); text-shadow: 0 1px 3px #000;
+}
+
+/* Нижний уровень — отдельное окно под радаром, появляется, когда там кто-то есть */
+.radar__lower {
+  position: absolute; left: 0; top: calc(100% + 8px);
+  width: 170px; height: 170px;
+  background: var(--glass);
+  box-shadow: inset 0 0 0 1px var(--line);
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%);
+  overflow: hidden;
+  animation: radarIn .25s ease-out;
+}
+.radar__lower-map { position: absolute; inset: 0; width: 100%; height: 100%; opacity: .85; }
+.radar__lower-tag {
+  position: absolute; left: 6px; top: 4px;
+  font-size: 9px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--muted);
+}
+.radar__lower .rp { --s: 13px; }
+.radar__lower .rp__num { font-size: 8px; }
+
+/* Игрок */
+.rp {
+  --s: 17px; --c: var(--ct);
+  position: absolute; left: 0; top: 0;
+  width: var(--s); height: var(--s); margin: calc(var(--s) / -2) 0 0 calc(var(--s) / -2);
+  z-index: 3; will-change: transform;
+}
+.rp.is-t { --c: var(--t); }
+.rp::before {
+  content: ''; position: absolute; inset: 0; border-radius: 50%;
+  background: var(--c); box-shadow: 0 0 0 1.5px rgba(6,5,13,.9), 0 2px 6px rgba(0,0,0,.6);
+}
+.rp__dir {
+  position: absolute; left: 50%; top: 50%; width: 0; height: 0;
+  transform: rotate(var(--yaw, 0deg));
+}
+.rp__dir::after {
+  content: ''; position: absolute; left: calc(var(--s) / 2 - 2px); top: -5px;
+  border-left: 8px solid var(--c); border-top: 5px solid transparent; border-bottom: 5px solid transparent;
+  filter: drop-shadow(0 0 1px rgba(6,5,13,.9));
+}
+.rp__num {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  font-size: 10px; font-weight: 900; color: #0B0818; line-height: 1;
+}
+.rp.is-observed { --s: 22px; z-index: 4; }
+.rp.is-observed::before { box-shadow: 0 0 0 2px #fff, 0 0 14px 2px var(--c); }
+.rp.is-flashed::before { background: #fff; }
+.rp.has-bomb::after {
+  content: ''; position: absolute; right: -5px; top: -5px; width: 8px; height: 8px;
+  background: var(--danger); box-shadow: 0 0 0 1.5px #0B0818; border-radius: 2px;
+}
+.rp.is-dead { z-index: 1; }
+.rp.is-dead::before { background: transparent; box-shadow: none; }
+.rp.is-dead .rp__dir { display: none; }
+.rp.is-dead .rp__num { color: transparent; }
+.rp.is-dead .rp__num::before, .rp.is-dead .rp__num::after {
+  content: ''; position: absolute; left: 50%; top: 50%; width: 13px; height: 3px; margin: -1.5px 0 0 -6.5px;
+  background: var(--c); opacity: .75; border-radius: 1px; transform: rotate(45deg);
+}
+.rp.is-dead .rp__num::after { transform: rotate(-45deg); }
+
+/* Бомба на земле */
+.rb {
+  position: absolute; left: 0; top: 0; z-index: 2;
+  width: 18px; height: 18px; margin: -9px 0 0 -9px;
+  color: var(--danger); filter: drop-shadow(0 0 2px #000);
+}
+.rb .ico { width: 100%; height: 100%; }
+.rb--dropped { color: var(--t-soft); }
+.rb--planted, .rb--planting { animation: bombBlink 1s steps(2) infinite; }
+.rb--defusing { color: var(--ct-soft); animation: bombBlink .5s steps(2) infinite; }
+.rb--defused { color: var(--ct); }
+@keyframes bombBlink { 50% { opacity: .35; } }
+
+/* Гранаты */
+.rn { position: absolute; left: 0; top: 0; z-index: 1; border-radius: 50%; pointer-events: none; }
+.rn--smoke { background: rgba(220,224,235,.55); box-shadow: 0 0 10px rgba(220,224,235,.4); }
+.rn--fire  { background: rgba(255,98,40,.55); box-shadow: 0 0 6px rgba(255,120,40,.6); }
+.rn--fly   { width: 6px; height: 6px; margin: -3px 0 0 -3px; background: #fff; box-shadow: 0 0 0 1px #0B0818; }
+.rn--fly.rn--smoke { background: #cfd3de; }
+.rn--fly.rn--he    { background: #ff6a5e; }
+.rn--fly.rn--fire  { background: #ff8a3d; }
+.rn--fly.rn--flash { background: #fffbe0; }
+
+/* Обратный отсчёт слева сверху уходит под радар */
+body.has-radar .cd[data-pos="top-left"] { top: calc(var(--edge) + 336px); }
+body.has-radar-lower .cd[data-pos="top-left"] { top: calc(var(--edge) + 514px); }
+
 /* ======================================================= СЛУЖЕБНОЕ */
 
 .conn { position: absolute; right: 14px; bottom: 14px; z-index: 30; padding: 6px 12px; background: var(--danger); color: #2A0512; font-size: 12px; font-weight: 700; }
