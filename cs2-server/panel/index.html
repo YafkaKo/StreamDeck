@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CS2 — панель админа</title>
+<style>
+  :root { --bg:#12151a; --panel:#1b2028; --line:#2c333f; --text:#e8ecf1; --muted:#8f9bab; --accent:#f5a623; --ok:#3fb950; --bad:#f85149; --t:#d9a441; --ct:#5b9bd5; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.45 "Segoe UI", system-ui, sans-serif; }
+  header { display:flex; flex-wrap:wrap; align-items:center; gap:12px 24px; padding:14px 20px; background:var(--panel); border-bottom:1px solid var(--line); position:sticky; top:0; z-index:2; }
+  h1 { font-size:18px; margin:0; font-weight:600; }
+  .pill { display:inline-flex; align-items:center; gap:8px; padding:4px 12px; border-radius:999px; background:#0d1014; border:1px solid var(--line); font-size:14px; }
+  .dot { width:9px; height:9px; border-radius:50%; background:var(--bad); }
+  .online .dot { background:var(--ok); }
+  main { display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:16px; padding:16px 20px 32px; max-width:1300px; margin:0 auto; }
+  section { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px; }
+  section.wide { grid-column:1 / -1; }
+  h2 { font-size:13px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin:0 0 12px; font-weight:600; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(130px, 1fr)); gap:8px; }
+  button { font:inherit; color:var(--text); background:#262d38; border:1px solid var(--line); border-radius:8px; padding:11px 12px; cursor:pointer; min-height:44px; transition:background .12s, border-color .12s; }
+  button:hover { background:#303947; border-color:#44506180; }
+  button:focus-visible, input:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#1a1300; font-weight:600; }
+  button.primary:hover { background:#ffb84a; }
+  button.danger { border-color:#f8514966; color:#ff8f88; }
+  button.current { border-color:var(--accent); box-shadow:inset 0 0 0 1px var(--accent); }
+  button.small { min-height:32px; padding:4px 10px; font-size:13px; }
+  table { width:100%; border-collapse:collapse; }
+  th, td { text-align:left; padding:7px 6px; border-bottom:1px solid var(--line); }
+  th { color:var(--muted); font-weight:500; font-size:13px; }
+  td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; }
+  .muted { color:var(--muted); }
+  .row { display:flex; gap:8px; }
+  input { flex:1; font:inherit; color:var(--text); background:#0d1014; border:1px solid var(--line); border-radius:8px; padding:10px 12px; min-width:0; }
+  pre { margin:12px 0 0; background:#0d1014; border:1px solid var(--line); border-radius:8px; padding:12px; height:220px; overflow:auto; font:13px/1.4 Consolas, monospace; white-space:pre-wrap; word-break:break-word; }
+  #login { position:fixed; inset:0; background:var(--bg); display:flex; align-items:center; justify-content:center; z-index:5; padding:20px; }
+  #login form { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:24px; width:100%; max-width:360px; display:grid; gap:12px; }
+  #login .err { color:var(--bad); min-height:1.4em; font-size:14px; }
+  [hidden] { display:none !important; }
+</style>
+</head>
+<body>
+
+<div id="login" hidden>
+  <form id="loginForm">
+    <h1>Панель админа CS2</h1>
+    <label for="pw" class="muted">Пароль (rcon_password из cfg\server.cfg)</label>
+    <input id="pw" type="password" autocomplete="current-password" required>
+    <div class="err" id="loginErr" role="alert"></div>
+    <button class="primary" type="submit">Войти</button>
+  </form>
+</div>
+
+<header>
+  <h1>CS2 — панель админа</h1>
+  <span class="pill" id="state" role="status"><span class="dot"></span><span id="stateText">подключение…</span></span>
+  <span class="pill">Карта: <b id="map">—</b></span>
+  <span class="pill">Игроков: <b id="count">—</b></span>
+</header>
+
+<main>
+  <section>
+    <h2>Матч</h2>
+    <p class="muted" id="modeNote" style="margin:-4px 0 12px"></p>
+    <div class="grid">
+      <button class="primary" data-cmd="mp_warmup_end" data-mz="css_start" data-say="Матч начат" data-confirm="Начать матч, не дожидаясь !ready от всех?">Начать матч</button>
+      <button data-cmd="mp_pause_match" data-mz="css_forcepause" data-say="Пауза включится в начале следующего раунда">Пауза</button>
+      <button data-cmd="mp_unpause_match" data-mz="css_forceunpause" data-say="Пауза снята">Снять паузу</button>
+      <button data-cmd="mp_warmup_start" data-mz="css_restart" data-confirm="Сбросить матч и вернуть разминку? Счёт обнулится.">Сбросить в разминку</button>
+      <button data-cmd="mp_swapteams" data-confirm="Поменять команды сторонами?">Поменять стороны</button>
+      <button class="danger" data-cmd="mp_restartgame 1" data-mz="" data-confirm="Перезапустить матч? Счёт обнулится.">Рестарт матча</button>
+      <button data-mz="css_roundknife" hidden>Нож-раунд вкл/выкл</button>
+      <button data-mz="restore" hidden>Откатить раунд…</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Карта</h2>
+    <div class="grid" id="maps"></div>
+  </section>
+
+  <section>
+    <h2>Боты (для проверки)</h2>
+    <div class="grid">
+      <button data-bot="t">+ бот за T</button>
+      <button data-bot="ct">+ бот за CT</button>
+      <button data-cmd="bot_quota 0; bot_kick" data-say="Боты убраны">Убрать всех ботов</button>
+    </div>
+  </section>
+
+  <section class="wide">
+    <h2>Игроки на сервере</h2>
+    <table>
+      <thead><tr><th>Ник</th><th class="num">Пинг</th><th class="num">На сервере</th><th></th></tr></thead>
+      <tbody id="players"><tr><td colspan="4" class="muted">—</td></tr></tbody>
+    </table>
+  </section>
+
+  <section class="wide">
+    <h2>Любая команда сервера</h2>
+    <form class="row" id="cmdForm">
+      <input id="cmd" placeholder="например: mp_maxrounds 24" autocomplete="off" aria-label="Команда сервера">
+      <button type="submit">Отправить</button>
+    </form>
+    <pre id="log" aria-live="polite"></pre>
+  </section>
+</main>
+
+<script>
+const MAPS = [['de_mirage','Mirage'],['de_inferno','Inferno'],['de_nuke','Nuke'],['de_ancient','Ancient'],['de_anubis','Anubis'],['de_dust2','Dust II'],['de_cache','Cache'],['de_train','Train'],['de_overpass','Overpass'],['de_vertigo','Vertigo']];
+const $ = (id) => document.getElementById(id);
+let password = sessionStorage.getItem('pw') || '';
+
+function log(text) {
+  const el = $('log');
+  el.textContent += `[${new Date().toLocaleTimeString()}] ${text}\n`;
+  el.scrollTop = el.scrollHeight;
+}
+
+async function api(path, body) {
+  const res = await fetch(path, {
+    method: body ? 'POST' : 'GET',
+    headers: { 'X-Panel-Password': password, 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (res.status === 401) { showLogin('Неверный пароль'); throw new Error('Неверный пароль'); }
+  return res.json();
+}
+
+function showLogin(err) {
+  sessionStorage.removeItem('pw');
+  $('loginErr').textContent = password ? err || '' : '';
+  password = '';
+  $('login').hidden = false;
+  $('pw').focus();
+}
+
+async function run(cmd, say) {
+  log('> ' + cmd);
+  try {
+    const r = await api('/api/cmd', { cmd });
+    if (r.error) log('ОШИБКА: ' + r.error);
+    else log((r.output || '').trim() || say || 'ок');
+  } catch (e) { log('ОШИБКА: ' + e.message); }
+  refresh();
+}
+
+function setOnline(on, text) {
+  $('state').classList.toggle('online', on);
+  $('stateText').textContent = text;
+  document.querySelectorAll('main button').forEach((b) => (b.disabled = !on));
+}
+
+async function refresh() {
+  if (!password) return;
+  let s;
+  try { s = await api('/api/status'); } catch (e) { return setOnline(false, e.message === 'Неверный пароль' ? 'нужен пароль' : 'панель не отвечает'); }
+  if (!s.online) { setOnline(false, s.error || 'сервер не запущен'); $('map').textContent = '—'; $('count').textContent = '—'; return; }
+  setOnline(true, 'сервер работает');
+  if (s.matchzy !== matchzy) { matchzy = s.matchzy; applyMode(); }
+  $('map').textContent = s.map || '—';
+  const people = s.players.filter((p) => p.name !== 'SourceTV' && !/GOTV/i.test(p.name));
+  const humans = people.filter((p) => !p.bot).length;
+  botCount = people.length - humans;
+  $('count').textContent = `${humans}` + (people.length > humans ? ` + ${people.length - humans} бот.` : '');
+  document.querySelectorAll('#maps button').forEach((b) => b.classList.toggle('current', b.dataset.map === s.map));
+  const tbody = $('players');
+  tbody.replaceChildren(...(people.length ? people.map((p) => {
+    const tr = document.createElement('tr');
+    const cell = (text, cls) => { const td = document.createElement('td'); td.textContent = text; if (cls) td.className = cls; return td; };
+    const kick = document.createElement('button');
+    kick.className = 'small danger';
+    kick.textContent = 'Кик';
+    kick.onclick = () => confirm(`Выкинуть ${p.name}?`) && run(`kickid ${p.id}`, 'Игрок выкинут');
+    const last = document.createElement('td'); last.className = 'num'; last.append(kick);
+    tr.append(cell(p.name + (p.bot ? ' (бот)' : '')), cell(p.bot ? '—' : p.ping, 'num'), cell(p.bot ? '—' : p.time, 'num'), last);
+    return tr;
+  }) : [Object.assign(document.createElement('tr'), { innerHTML: '<td colspan="4" class="muted">Никого нет</td>' })]));
+}
+
+for (const [id, name] of MAPS) {
+  const b = document.createElement('button');
+  b.textContent = name; b.dataset.map = id; b.title = id;
+  b.onclick = () => confirm(`Сменить карту на ${name}? Текущий матч прервётся, всех перекинет на новую карту.`) && run('changelevel ' + id, 'Меняю карту…');
+  $('maps').append(b);
+}
+let matchzy = false;
+let botCount = 0;
+// bot_add в CS2 поднимает bot_quota сразу на 2 (добавляется два бота), поэтому задаём точное число.
+document.querySelectorAll('button[data-bot]').forEach((b) => {
+  b.onclick = () => run(`bot_join_team ${b.dataset.bot}; bot_quota_mode normal; bot_quota ${botCount + 1}`, 'Бот добавлен');
+});
+// С MatchZy берём data-mz (пусто = кнопка не нужна), без него - data-cmd (нет = кнопка только для MatchZy).
+const cmdOf = (b) => (matchzy && 'mz' in b.dataset ? b.dataset.mz : b.dataset.cmd);
+function applyMode() {
+  document.querySelectorAll('button[data-cmd], button[data-mz]').forEach((b) => (b.hidden = !cmdOf(b)));
+  $('modeNote').textContent = matchzy
+    ? 'Режим MatchZy: игроки пишут !ready, после разминки нож-раунд. «Начать матч» — старт без ожидания !ready.'
+    : 'Без модов: матч начинается кнопкой «Начать матч».';
+}
+document.querySelectorAll('button[data-cmd], button[data-mz]').forEach((b) => {
+  b.onclick = () => {
+    const cmd = cmdOf(b);
+    if (cmd === 'restore') {
+      const n = prompt('Откатить на начало какого раунда? (номер раунда)');
+      if (n && /^\d+$/.test(n.trim())) run('css_restore ' + n.trim(), 'Раунд восстановлен');
+      return;
+    }
+    if (!b.dataset.confirm || confirm(b.dataset.confirm)) run(cmd, b.dataset.say);
+  };
+});
+applyMode();
+$('cmdForm').onsubmit = (e) => { e.preventDefault(); const v = $('cmd').value.trim(); if (v) { run(v); $('cmd').value = ''; } };
+$('loginForm').onsubmit = async (e) => {
+  e.preventDefault();
+  password = $('pw').value;
+  try { await api('/api/status'); } catch { return; }
+  sessionStorage.setItem('pw', password);
+  $('login').hidden = true; $('pw').value = '';
+  refresh();
+};
+
+if (!password) showLogin(); else refresh();
+setInterval(refresh, 3000);
+</script>
+</body>
+</html>
