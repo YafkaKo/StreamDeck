@@ -22,9 +22,11 @@ function connect() {
 connect();
 
 async function api(url, opts = {}) {
+  const headers = rconHeader();
+  if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
   const res = await fetch(url, {
     method: opts.method || 'POST',
-    headers: opts.body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+    headers,
     body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined
   });
   const data = await res.json().catch(() => ({}));
@@ -110,6 +112,7 @@ function renderHud(prev) {
 
   renderPickSettings();
   if (!prev || prev.game !== game) renderKeys();
+  if (typeof renderServer === 'function') renderServer();
 }
 
 function clockSigned(s) {

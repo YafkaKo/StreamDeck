@@ -253,7 +253,8 @@ document.addEventListener('click', async (e) => {
   if (act) {
     buzz();
     try {
-      const res = await fetch(`/api/action/${act.dataset.act}`, { method: 'POST' });
+      if (act.dataset.confirm && !confirm(act.dataset.confirm)) return;
+      const res = await fetch(`/api/action/${act.dataset.act}`, { method: 'POST', headers: rconHeader() });
       const body = await res.json().catch(() => ({}));
       toast(res.ok ? (ACT_DONE[act.dataset.act] || 'Готово') : (body.error || 'Не получилось'));
     } catch { toast('Не отправилось — нет связи с сервером'); }
@@ -385,7 +386,15 @@ bindHotkeys(window, {
 
 /* ----------------------------------------------------------- две игры и реклама */
 
-const ACT_DONE = { 'ads-play': 'Реклама запускается', 'ads-stop': 'Реклама останавливается', 'ads-skip': 'Следующий ролик', 'sides-swap': 'Стороны поменялись' };
+const ACT_DONE = {
+  'ads-play': 'Реклама запускается', 'ads-stop': 'Реклама останавливается', 'ads-skip': 'Следующий ролик', 'sides-swap': 'Стороны поменялись',
+  'srv-pause-ads': 'Пауза заказана — реклама начнётся вместе с ней', 'srv-pause': 'Пауза с заморозкой следующего раунда',
+  'srv-unpause': 'Пауза снята', 'srv-start': 'Матч начат'
+};
+
+// Пароль сервера CS2 хранится в этом телефоне (rconHeader из hotkeys.js его подставляет)
+try { $('srvPw').value = localStorage.getItem('hud-rcon-pw') || ''; } catch { /* */ }
+$('srvPw').addEventListener('change', () => { try { localStorage.setItem('hud-rcon-pw', $('srvPw').value); } catch { /* */ } });
 
 function renderHud() {
   if (!hud) return;
@@ -405,6 +414,8 @@ function renderHud() {
     $('onairScene').textContent = SCENE_NAMES[hud.scene] || hud.scene;
     document.querySelectorAll('[data-scene]').forEach((b) => b.classList.toggle('is-active', b.dataset.scene === hud.scene));
   }
+  const srv = hud.cs2server;
+  if (srv) $('srvState').textContent = srv.online ? `· ${srv.map || ''} · ${srv.humans} игр.${srv.armed ? ' · ждём паузу' : ''}` : '· не отвечает';
   const a = hud.ads;
   const playing = a.status === 'playing';
   $('pauseHint').hidden = !hud.paused || playing;

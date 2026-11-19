@@ -84,26 +84,8 @@ function createCs2(ctx) {
 
     // «Карта сыграна»: счёт из игры, победитель в списке карт, очко серии.
     app.post('/api/map/finish', (req, res) => {
-      const body = req.body || {};
-      const scoreA = Number.isFinite(body.scoreA) ? body.scoreA : game?.a?.score ?? null;
-      const scoreB = Number.isFinite(body.scoreB) ? body.scoreB : game?.b?.score ?? null;
-      if (scoreA === null || scoreB === null || scoreA === scoreB) {
-        return res.status(400).json({ error: 'Нет счёта карты или ничья — победителя отметьте вручную.' });
-      }
-      const c = control();
-      const winner = scoreA > scoreB ? 'A' : 'B';
-      const maps = (c.series.maps || []).map(m => ({ ...m }));
-      let idx = maps.findIndex(m => game?.map?.name && m.map === game.map.name && !m.winner);
-      if (idx < 0) idx = maps.findIndex(m => !m.winner);
-      if (idx >= 0) Object.assign(maps[idx], { winner, scoreA, scoreB });
-      ctx.patch('cs2', {
-        series: {
-          maps,
-          aWins: c.series.aWins + (winner === 'A' ? 1 : 0),
-          bWins: c.series.bWins + (winner === 'B' ? 1 : 0)
-        },
-        results: { winner }
-      });
+      const out = finishMap(req.body || {});
+      if (out.error) return res.status(400).json(out);
       res.json(control());
     });
 
@@ -147,6 +129,30 @@ function createCs2(ctx) {
     });
   }
 
+  /** «Карта сыграна»: счёт из игры, победитель в списке карт, очко серии. Кнопка пульта и событие MatchZy. */
+  function finishMap(body) {
+    const scoreA = Number.isFinite(body.scoreA) ? body.scoreA : game?.a?.score ?? null;
+    const scoreB = Number.isFinite(body.scoreB) ? body.scoreB : game?.b?.score ?? null;
+    if (scoreA === null || scoreB === null || scoreA === scoreB) {
+      return { error: 'Нет счёта карты или ничья — победителя отметьте вручную.' };
+    }
+    const c = control();
+    const winner = scoreA > scoreB ? 'A' : 'B';
+    const maps = (c.series.maps || []).map(m => ({ ...m }));
+    let idx = maps.findIndex(m => game?.map?.name && m.map === game.map.name && !m.winner);
+    if (idx < 0) idx = maps.findIndex(m => !m.winner);
+    if (idx >= 0) Object.assign(maps[idx], { winner, scoreA, scoreB });
+    ctx.patch('cs2', {
+      series: {
+        maps,
+        aWins: c.series.aWins + (winner === 'A' ? 1 : 0),
+        bWins: c.series.bWins + (winner === 'B' ? 1 : 0)
+      },
+      results: { winner }
+    });
+    return { ok: true, winner, scoreA, scoreB };
+  }
+
   function swapSides() {
     match.swapSides();
     rebuild(); push();
@@ -170,6 +176,7 @@ function createCs2(ctx) {
     afterChange() { rebuild(); push(); },
     start() {},
     swapSides,
+    finishMap,
     resetAll() { match.resetPlayers(); match.resetMapStats(); rebuild(); push(); },
     state: () => ({ game, raw, rawAgeMs: raw ? Date.now() - rawAt : null })
   };

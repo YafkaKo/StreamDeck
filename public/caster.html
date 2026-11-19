@@ -161,6 +161,20 @@
     <button type="button" class="ghost" id="swapTeams" data-only="dota">Команды поменялись сторонами</button>
     <button type="button" class="ghost" data-act="sides-swap" data-only="cs2">Поменять стороны CT / T</button>
 
+    <h2 data-only="cs2">Сервер CS2 <span id="srvState"></span></h2>
+    <div data-only="cs2">
+      <div class="row">
+        <button type="button" data-act="srv-pause-ads">Пауза + реклама</button>
+        <button type="button" class="ghost" data-act="srv-unpause">Снять паузу</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button type="button" class="ghost" data-act="srv-pause">Только пауза</button>
+        <button type="button" class="ghost" data-act="srv-start" data-confirm="Начать матч, не дожидаясь !ready от всех?">Начать матч</button>
+      </div>
+      <label class="field" style="margin-top:10px"><span>Пароль сервера (rcon_password) — нужен для кнопок выше</span>
+        <input type="password" id="srvPw" autocomplete="current-password" placeholder="пароль rcon"></label>
+    </div>
+
     <h2>Турнир</h2>
     <label class="field"><span>Стадия</span><input data-path="stage" autocomplete="off"></label>
 
@@ -259,8 +273,8 @@
 
 <script src="/js/heroes.js?v=20261102"></script>
 <script src="/js/dota.js?v=20261102"></script>
-<script src="/js/hotkeys.js?v=20261102"></script>
+<script src="/js/hotkeys.js?v=20261119"></script>
 <script src="/js/backgrounds.js?v=20261102"></script>
-<script src="/js/caster.js?v=20261102"></script>
+<script src="/js/caster.js?v=20261119"></script>
 </body>
 </html>

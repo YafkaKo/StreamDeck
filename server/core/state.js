@@ -81,7 +81,9 @@ function defaults() {
         players: true, observed: true, economy: true, roundResult: true,
         killfeed: false, rounds: false, stats: false,
         radar: true, radarNades: true
-      }
+      },
+      // Сервер CS2 (cs2-server/): что делать по событиям MatchZy
+      server: { autoFinish: true, autoTeamNames: true }
     },
     ads: {
       defaultTransition: '',      // id перехода по умолчанию
@@ -301,6 +303,7 @@ function cs2View(s) {
     ticker: sh.ticker,
     showHud: sh.showHud,
     panels: s.cs2.panels,
+    server: s.cs2.server,
     trivia: { ...sh.trivia, list: libraryToText(sh.triviaLibrary), index: sh.triviaIndex }
   };
 }

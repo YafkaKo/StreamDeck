@@ -13,10 +13,11 @@ const SCENE_TITLES = {
   results: 'Итог-заставка', scoreboard: 'Таблица счёта', veto: 'Пики карт', blank: 'Чистый экран'
 };
 
-function buildActions({ state, change, games, ads, pickFx }) {
+function buildActions({ state, change, games, ads, pickFx, cs2server }) {
   const sh = () => state.s.shared;
   const list = [];
-  const add = (name, title, gamesFor, run) => list.push({ name, title, games: gamesFor, run });
+  // secure — команда игровому серверу: только с этого ПК или с паролем rcon
+  const add = (name, title, gamesFor, run, secure = false) => list.push({ name, title, games: gamesFor, run, secure });
   const BOTH = ['dota', 'cs2'];
 
   // ---------------------------------------------------------------- сцены
@@ -111,6 +112,8 @@ function buildActions({ state, change, games, ads, pickFx }) {
     toggle('toggle-pickfx', 'Анимация пика', ['dota'], () => state.s.pickFx.enabled, (v) => { state.s.pickFx.enabled = v; });
   }
 
+  if (cs2server) cs2server.actions(add);
+
   const byName = new Map(list.map(a => [a.name, a]));
   // Старые имена из CS2-HUD и пульта Dota.
   const ALIASES = { 'toggle-results': 'toggle-mapResults', 'toggle-maps': 'toggle-mapResults' };
@@ -120,8 +123,10 @@ function buildActions({ state, change, games, ads, pickFx }) {
       const a = byName.get(ALIASES[name] || name);
       if (!a) return null;
       const out = a.run();
+      if (out && typeof out.then === 'function') return out.then((v) => (v && typeof v === 'object' ? v : {}));
       return out && typeof out === 'object' ? out : {};
     },
+    secure: (name) => !!(byName.get(ALIASES[name] || name) || {}).secure,
     list(game) {
       return list.filter(a => !game || a.games.includes(game)).map(({ name, title, games: g }) => ({ name, title, games: g }));
     },

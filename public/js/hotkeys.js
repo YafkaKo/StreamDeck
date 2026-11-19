@@ -37,9 +37,18 @@ const HOTKEYS = {
     { key: 'KeyM', label: 'Alt+M', action: 'toggle-rounds', title: 'История раундов' },
     { key: 'KeyB', label: 'Alt+B', action: 'toggle-economy', title: 'Экономика в закупку' },
     { key: 'KeyL', label: 'Alt+L', action: 'toggle-killfeed', title: 'Своя лента убийств' },
-    { key: 'KeyG', label: 'Alt+G', action: 'toggle-radar', title: 'Радар' }
+    { key: 'KeyG', label: 'Alt+G', action: 'toggle-radar', title: 'Радар' },
+    { key: 'KeyP', label: 'Alt+P', action: 'srv-pause-ads', title: 'Сервер: пауза + реклама' },
+    { key: 'KeyU', label: 'Alt+U', action: 'srv-unpause', title: 'Сервер: снять паузу' }
   ]
 };
+
+/** Пароль сервера CS2 (если пульт открыт не на ПК сервера) — для команд серверу. */
+function rconHeader() {
+  let pw = '';
+  try { pw = sessionStorage.getItem('hud-rcon-pw') || localStorage.getItem('hud-rcon-pw') || ''; } catch { /* приватный режим */ }
+  return pw ? { 'X-Rcon-Password': pw } : {};
+}
 
 function hotkeysFor(game) {
   return [...HOTKEYS.common, ...(HOTKEYS[game] || [])];
@@ -60,7 +69,7 @@ function bindHotkeys(win, { getGame, onAction }) {
     if (!hk) return;
     e.preventDefault();
     e.stopPropagation();
-    fetch(`/api/action/${encodeURIComponent(hk.action)}`, { method: 'POST' })
+    fetch(`/api/action/${encodeURIComponent(hk.action)}`, { method: 'POST', headers: rconHeader() })
       .then((r) => r.json().catch(() => ({})).then((body) => ({ ok: r.ok, body })))
       .then(({ ok, body }) => onAction && onAction(hk, ok ? body : { error: body.error || 'не выполнено' }))
       .catch(() => onAction && onAction(hk, { error: 'нет связи с сервером' }));

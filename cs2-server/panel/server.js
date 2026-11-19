@@ -171,7 +171,12 @@ function selftest() {
   console.log('selftest ok');
 }
 
-if (process.argv.includes('--selftest')) selftest();
+// HUD (server/core/cs2server.js) подключает этот файл как модуль и берёт отсюда rcon и разбор status —
+// один код и одни настройки на панель и на пульт трансляции.
+module.exports = { rcon, parseStatus, readConfig, sameSecret };
+
+if (require.main !== module) { /* подключён как модуль: свою панель не запускаем */ }
+else if (process.argv.includes('--selftest')) selftest();
 else {
   http.createServer((req, res) => handle(req, res).catch((e) => send(res, 500, { error: e.message })))
     .listen(PANEL_PORT, '0.0.0.0', () => {

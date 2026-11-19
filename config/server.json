@@ -31,5 +31,10 @@
     "enabled": false,
     "onlyDraft": true,
     "compact": true
+  },
+  "cs2server": {
+    "host": "auto",
+    "port": 0,
+    "pollSec": 3
   }
 }

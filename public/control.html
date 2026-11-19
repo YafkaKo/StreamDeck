@@ -47,6 +47,7 @@
   <button type="button" data-tab="game" class="is-active">Пульт игры</button>
   <button type="button" data-tab="ads">Реклама</button>
   <button type="button" data-tab="pick" data-only="dota">Пик героя</button>
+  <button type="button" data-tab="server" data-only="cs2">Сервер CS2 <i class="tabdot" id="srvDot"></i></button>
   <button type="button" data-tab="keys">Хоткеи</button>
 </nav>
 
@@ -157,6 +158,96 @@
     </div>
   </section>
 
+  <!-- ============================ СЕРВЕР CS2 ============================ -->
+  <section class="panel" data-panel="server">
+    <div class="srv-login card" id="srvLogin" hidden>
+      <h2>Вход к серверу CS2</h2>
+      <p class="hint">Пульт открыт не на компьютере сервера — нужен пароль <code>rcon_password</code> из <code>cs2-server/cfg/server.cfg</code>.</p>
+      <form class="row" id="srvLoginForm">
+        <input type="password" id="srvPw" autocomplete="current-password" placeholder="пароль rcon" required>
+        <button type="submit" class="btn btn--accent">Войти</button>
+      </form>
+      <p class="msg is-error" id="srvLoginErr" hidden></p>
+    </div>
+
+    <div class="ads-grid" id="srvMain">
+      <div class="col">
+        <section class="card">
+          <h2>Сервер <span class="h-hint" id="srvMode"></span></h2>
+          <div class="srv-state">
+            <span class="pill" id="srvPill"><i></i><span id="srvState">проверяю…</span></span>
+            <span class="pill">Карта: <b id="srvMap">—</b></span>
+            <span class="pill">Игроков: <b id="srvCount">—</b></span>
+          </div>
+          <p class="hint" id="srvError" hidden></p>
+        </section>
+
+        <section class="card">
+          <h2>Матч <span class="h-hint">пауза начинается с заморозкой следующего раунда</span></h2>
+          <div class="row row--big">
+            <button type="button" class="btn btn--accent btn--big" data-srv-act="srv-pause-ads">Пауза + реклама <kbd>Alt+P</kbd></button>
+            <button type="button" class="btn btn--big" data-srv-act="srv-unpause">Снять паузу <kbd>Alt+U</kbd></button>
+          </div>
+          <p class="msg" id="srvArmed" hidden>Пауза заказана — реклама включится, как только пауза начнётся.</p>
+          <div class="srv-grid">
+            <button type="button" class="btn" data-srv-act="srv-start" data-confirm="Начать матч, не дожидаясь !ready от всех?">Начать матч</button>
+            <button type="button" class="btn" data-srv-act="srv-pause">Пауза</button>
+            <button type="button" class="btn" data-cmd="mp_warmup_start" data-mz="css_restart" data-confirm="Сбросить матч и вернуть разминку? Счёт обнулится.">Сбросить в разминку</button>
+            <button type="button" class="btn" data-cmd="mp_swapteams" data-confirm="Поменять команды сторонами на сервере?">Поменять стороны</button>
+            <button type="button" class="btn" data-mz="css_roundknife" hidden>Нож-раунд вкл/выкл</button>
+            <button type="button" class="btn" data-mz="restore" hidden>Откатить раунд…</button>
+            <button type="button" class="btn btn--danger" data-cmd="mp_restartgame 1" data-mz="" data-confirm="Перезапустить матч? Счёт обнулится.">Рестарт матча</button>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Карта <span class="h-hint">смена прерывает текущий матч</span></h2>
+          <div class="srv-grid" id="srvMaps"></div>
+        </section>
+
+        <section class="card">
+          <h2>Связка с HUD</h2>
+          <label class="switch"><input type="checkbox" id="srvAutoFinish"><span>Карта сыграна → записать итог сам (событие MatchZy)</span></label>
+          <label class="switch"><input type="checkbox" id="srvAutoNames"><span>На старте матча отправлять названия команд на сервер</span></label>
+          <div class="row">
+            <button type="button" class="btn" data-srv-act="srv-teamnames">Отправить названия команд сейчас</button>
+          </div>
+          <p class="hint">Названия берутся из пульта игры (команды A и B) и стороны, за которую команда A начинает карту.</p>
+        </section>
+      </div>
+
+      <div class="col">
+        <section class="card">
+          <h2>Игроки на сервере</h2>
+          <table class="srv-table">
+            <thead><tr><th>Ник</th><th class="num">Пинг</th><th class="num">На сервере</th><th></th></tr></thead>
+            <tbody id="srvPlayers"><tr><td colspan="4" class="empty">—</td></tr></tbody>
+          </table>
+          <div class="row">
+            <span class="h-hint">Боты для проверки:</span>
+            <button type="button" class="btn" data-bot="t">+ бот за T</button>
+            <button type="button" class="btn" data-bot="ct">+ бот за CT</button>
+            <button type="button" class="btn" data-cmd="bot_quota 0; bot_kick">Убрать ботов</button>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>События</h2>
+          <ul class="srv-events" id="srvEvents"><li class="empty">Пока ничего</li></ul>
+        </section>
+
+        <section class="card">
+          <h2>Любая команда сервера</h2>
+          <form class="row" id="srvCmdForm">
+            <input id="srvCmd" placeholder="например: mp_maxrounds 24" autocomplete="off" aria-label="Команда сервера">
+            <button type="submit" class="btn">Отправить</button>
+          </form>
+          <pre class="srv-log" id="srvLog" aria-live="polite"></pre>
+        </section>
+      </div>
+    </div>
+  </section>
+
   <!-- ============================ ХОТКЕИ ============================ -->
   <section class="panel" data-panel="keys">
     <div class="ads-grid">
@@ -180,7 +271,9 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="js/hotkeys.js?v=20261102"></script>
-<script src="js/shell-control.js?v=20261102"></script>
+<script src="js/hotkeys.js?v=20261119"></script>
+<script src="js/shell-control.js?v=20261119"></script>
+<script src="cs2/js/maps.js?v=20261119"></script>
+<script src="js/shell-server.js?v=20261119"></script>
 </body>
 </html>

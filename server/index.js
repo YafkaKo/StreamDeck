@@ -24,6 +24,7 @@ const { buildActions } = require('./core/actions');
 const { backgroundRoutes } = require('./core/backgrounds');
 const { createAds } = require('./core/ads');
 const { createPickFx } = require('./core/pickfx');
+const { createCs2Server } = require('./core/cs2server');
 const { mergeDeep, readJson, lanAddresses } = require('./core/util');
 const { createDota } = require('./games/dota');
 const { createCs2 } = require('./games/cs2');
@@ -68,7 +69,8 @@ const ctx = {
 const games = { dota: createDota(ctx), cs2: createCs2(ctx) };
 const ads = createAds({ root: ROOT, config: CONFIG, state, hub, change, onUpdate: () => scheduleHud() });
 const pickFx = createPickFx({ state, hub, change });
-const actions = buildActions({ state, change, games, ads, pickFx });
+const cs2server = createCs2Server({ root: ROOT, config: CONFIG, state, change, games, ads, onUpdate: () => scheduleHud() });
+const actions = buildActions({ state, change, games, ads, pickFx, cs2server });
 
 let changing = false;
 /**
@@ -111,6 +113,7 @@ function hudData() {
     countdown: { show: !!s.shared.countdown.show, to: s.shared.countdown.to },
     dota: { panels: s.dota.panels, probability: !!s.dota.probability.show, mapResults: !!s.dota.mapResults.show },
     cs2: { panels: s.cs2.panels },
+    cs2server: cs2server.publicState(),
     games: Object.fromEntries(GAMES.map((g) => [g, { label: games[g].label, alive: games[g].alive(), summary: games[g].summary() }])),
     paused: !!(active && active.paused()),
     ads: ads.publicState(),
@@ -255,8 +258,11 @@ app.post('/api/toggle/:key', (req, res) => {
 });
 
 // Быстрые действия — для хоткеев, агента и Stream Deck.
-app.all('/api/action/:name', (req, res) => {
-  const out = actions.run(req.params.name);
+app.all('/api/action/:name', async (req, res) => {
+  if (actions.secure(req.params.name) && !cs2server.trusted(req)) {
+    return res.status(401).json({ ok: false, error: 'Команды серверу CS2 — только с этого ПК или с паролем rcon' });
+  }
+  const out = await actions.run(req.params.name);
   if (out === null) return res.status(404).json({ error: 'Неизвестное действие', actions: actions.list(gameOf(req)).map(a => a.name) });
   if (out.error) return res.status(409).json({ ok: false, ...out });
   res.json({ ok: true, game: state.game, scene: state.s.shared.scene, ...out });
@@ -271,6 +277,7 @@ backgroundRoutes(app, express, { root: ROOT, state, change });
 games.dota.routes(app, express);
 games.cs2.routes(app, express);
 ads.routes(app, express);
+cs2server.routes(app);
 pickFx.routes(app);
 
 app.get('/api/health', (req, res) => {
