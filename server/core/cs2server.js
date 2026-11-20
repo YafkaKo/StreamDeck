@@ -14,13 +14,12 @@
 
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const { execFile } = require('child_process');
 
 function createCs2Server({ root, config, state, change, games, ads, onUpdate }) {
   const panel = require(path.join(root, 'cs2-server', 'panel', 'server.js'));
   const opts = { host: 'auto', port: 0, pollSec: 3, ...(config.cs2server || {}) };
-  // Адрес можно задать в config/server.json, иначе — как у самого сервера (settings.bat)
-  if (opts.host && opts.host !== 'auto') process.env.SERVER_IP = opts.host;
   if (opts.port) process.env.GAME_PORT = String(opts.port);
 
   const srv = () => state.s.cs2.server;
@@ -38,6 +37,8 @@ function createCs2Server({ root, config, state, change, games, ads, onUpdate }) 
     onUpdate();
   }
 
+  // Где сервер CS2 (по порядку): адрес из пульта (вкладка «Сервер CS2») → config/server.json
+  // cs2server.host → SERVER_IP из cs2-server/settings.bat → этот же компьютер.
   // SERVER_IP=auto: IP определяет detect-ip.ps1. Панель запускает его синхронно, а HUD так нельзя —
   // повиснут приём GSI и оверлей. Поэтому узнаём IP заранее, в фоне, и кладём в окружение.
   let ipError = '';
@@ -60,9 +61,52 @@ function createCs2Server({ root, config, state, change, games, ads, onUpdate }) 
   }
   detectIp();
 
+  /** Адрес сервера, вписанный вручную (пульт или config): "192.168.0.50" или "192.168.0.50:27015" */
+  function manualAddress() {
+    const v = String(srv().host || '').trim() || (opts.host && opts.host !== 'auto' ? String(opts.host) : '');
+    if (!v) return null;
+    const [host, port] = v.split(':');
+    return { host, port: port ? Number(port) : 0 };
+  }
+
   function conf() {
-    if (!process.env.SERVER_IP) throw new Error(ipError || 'Определяю IP этого компьютера…');
-    return panel.readConfig();
+    const manual = manualAddress();
+    if (!manual && !process.env.SERVER_IP) throw new Error(ipError || 'Определяю IP этого компьютера…');
+    const keep = process.env.SERVER_IP;
+    if (manual) process.env.SERVER_IP = manual.host; // readConfig не будет запускать detect-ip.ps1
+    let c;
+    try { c = panel.readConfig(); } finally { if (keep === undefined) delete process.env.SERVER_IP; else process.env.SERVER_IP = keep; }
+    if (manual) { c.host = manual.host; if (manual.port) c.port = manual.port; }
+    // Пароль rcon из пульта — если на ПК сервера его поменяли, а здесь server.cfg старый
+    if (srv().password) c.password = srv().password;
+    return c;
+  }
+
+  // ---------------------------------------------------------------- адрес HUD для MatchZy
+
+  // MatchZy шлёт события на matchzy_remote_log_url. Сервер может стоять на другом ПК, поэтому
+  // адрес HUD не пишем в config.cfg, а сообщаем серверу сами: IP этого ПК в той же сети, что сервер.
+  function hudAddressFor(serverHost) {
+    if (/^127\.|^localhost$/i.test(serverHost)) return '127.0.0.1';
+    const nets = Object.values(os.networkInterfaces()).flat().filter((n) => n && n.family === 'IPv4' && !n.internal);
+    const sameNet = nets.find((n) => {
+      const a = n.address.split('.').map(Number), m = n.netmask.split('.').map(Number), b = serverHost.split('.').map(Number);
+      return b.length === 4 && a.every((x, i) => (x & m[i]) === (b[i] & m[i]));
+    });
+    return (sameNet || nets[0] || { address: '127.0.0.1' }).address;
+  }
+
+  let hudUrl = '';
+  let hudUrlAt = 0;
+  let hudUrlMap = null;
+  async function pushHudUrl(c) {
+    const url = `http://${hudAddressFor(c.host)}:${config.port || 3000}/api/matchzy`;
+    // Раз в минуту и при смене карты (на новой карте плагин мог перечитать свой config.cfg)
+    if (url === hudUrl && info.map === hudUrlMap && Date.now() - hudUrlAt < 60000) return;
+    const token = String(config.token || '').replace(/["';]/g, '');
+    await panel.rcon(`matchzy_remote_log_url "${url}"; matchzy_remote_log_header_key "X-Hud-Token"; matchzy_remote_log_header_value "${token}"`, c);
+    if (url !== hudUrl) console.log(`[cs2-server] MatchZy будет слать события на ${url}`);
+    hudUrl = url; hudUrlAt = Date.now(); hudUrlMap = info.map;
   }
 
   async function run(cmd) {
@@ -83,10 +127,14 @@ function createCs2Server({ root, config, state, change, games, ads, onUpdate }) 
         info.matchzy = /"MatchZy"/.test(list);
         matchzyAt = Date.now();
       }
-      info = { ...info, online: true, checked: true, error: '', map: status.map, players: status.players, at: Date.now() };
+      info = { ...info, online: true, checked: true, error: '', map: status.map, players: status.players, at: Date.now(), host: `${c.host}:${c.port}` };
+      if (info.matchzy) await pushHudUrl(c).catch((err) => console.warn('[cs2-server] не удалось сообщить MatchZy адрес HUD:', err.message));
     } catch (err) {
-      info = { ...info, online: false, checked: true, error: err.message, players: [], at: Date.now() };
+      let host = '';
+      try { const c = conf(); host = `${c.host}:${c.port}`; } catch { /* адрес не известен */ }
+      info = { ...info, online: false, checked: true, error: err.message, players: [], at: Date.now(), host };
       matchzyAt = 0;
+      hudUrl = '';
     } finally {
       polling = false;
       onUpdate();
@@ -248,10 +296,19 @@ function createCs2Server({ root, config, state, change, games, ads, onUpdate }) 
     app.post('/api/cs2server/settings', (req, res) => {
       if (!trusted(req)) return res.status(401).json({ error: 'Нужен пароль rcon' });
       const b = req.body || {};
+      if (typeof b.host === 'string' && b.host.trim() && !/^[A-Za-z0-9.-]+(:\d{1,5})?$/.test(b.host.trim())) {
+        return res.status(400).json({ error: 'Адрес — IP или имя компьютера, можно с портом: 192.168.0.50 или 192.168.0.50:27015' });
+      }
       change(() => {
         for (const k of ['autoFinish', 'autoTeamNames']) if (typeof b[k] === 'boolean') srv()[k] = b[k];
+        if (typeof b.host === 'string') {
+          srv().host = b.host.trim();
+        }
+        if (typeof b.password === 'string') srv().password = b.password.slice(0, 100);
       });
-      res.json(srv());
+      hudUrl = '';
+      setTimeout(poll, 200);
+      res.json(publicState().settings);
     });
 
     // События MatchZy: matchzy_remote_log_url в cs2-server/cfg/MatchZy/config.cfg
@@ -287,7 +344,9 @@ function createCs2Server({ root, config, state, change, games, ads, onUpdate }) 
       bots: people.filter((p) => p.bot).length,
       players: people.map(({ id, name, ping, time, bot }) => ({ id, name, ping, time, bot })),
       armed: !!armed,
-      settings: { ...srv() },
+      host: info.host || '',
+      hudUrl,
+      settings: { autoFinish: !!srv().autoFinish, autoTeamNames: !!srv().autoTeamNames, host: srv().host || '', hasPassword: !!srv().password },
       events: events.slice(0, 12)
     };
   }

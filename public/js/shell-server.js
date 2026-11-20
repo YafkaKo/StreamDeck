@@ -99,6 +99,17 @@ $('srvCmdForm').addEventListener('submit', (e) => {
   if (v) { srvCmd(v); $('srvCmd').value = ''; }
 });
 
+$('srvAddrForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const body = { host: $('srvHost').value.trim() };
+  if ($('srvRconPw').value) body.password = $('srvRconPw').value;
+  try {
+    await api('/api/cs2server/settings', { body });
+    $('srvRconPw').value = '';
+    toast(body.host ? `Сервер CS2: ${body.host}` : 'Сервер CS2 — на этом компьютере');
+  } catch (ex) { toast(ex.message, true); }
+});
+
 for (const [id, key] of [['srvAutoFinish', 'autoFinish'], ['srvAutoNames', 'autoTeamNames']]) {
   $(id).addEventListener('change', () => api('/api/cs2server/settings', { body: { [key]: $(id).checked } }).catch((ex) => { toast(ex.message, true); renderServer(); }));
 }
@@ -123,7 +134,18 @@ function renderServer() {
   $('srvPill').classList.toggle('on', s.online);
   $('srvState').textContent = !s.checked ? 'проверяю…' : s.online ? 'сервер работает' : 'не отвечает';
   $('srvError').hidden = s.online || !s.error;
-  $('srvError').textContent = s.error ? `${s.error}. Запустите cs2-server\\start-server.bat — пульт подключится сам.` : '';
+  $('srvError').textContent = s.error
+    ? `${s.host ? `${s.host}: ` : ''}${s.error}. Запустите сервер (cs2-server\\start-server.bat на его компьютере) — пульт подключится сам. `
+      + 'Сервер на другом ПК — впишите его адрес ниже; на том ПК должен быть запущен firewall.bat.'
+    : '';
+  if (document.activeElement !== $('srvHost') && $('srvHost').dataset.saved !== s.settings.host) {
+    $('srvHost').value = s.settings.host;
+    $('srvHost').dataset.saved = s.settings.host;
+  }
+  $('srvPwHint').textContent = s.settings.hasPassword ? 'сохранён в пульте' : 'пусто — из server.cfg';
+  $('srvHud').textContent = s.online
+    ? `Подключено к ${s.host}.` + (s.matchzy ? (s.hudUrl ? ` События MatchZy идут на ${s.hudUrl}.` : ' Сообщаю MatchZy адрес HUD…') : '')
+    : '';
   $('srvMap').textContent = s.map ? (window.mapLabel ? mapLabel(s.map) : s.map) : '—';
   $('srvCount').textContent = s.online ? `${s.humans}${s.bots ? ` + ${s.bots} бот.` : ''}` : '—';
   $('srvArmed').hidden = !s.armed;

@@ -387,3 +387,6 @@ input[type=number] { width: 90px; }
   font: 12px/1.45 ui-monospace, Consolas, monospace; white-space: pre-wrap; word-break: break-word; color: #CFC8F0;
 }
 .ads-grid[hidden], .card[hidden], .msg[hidden], .hint[hidden] { display: none; }
+.srv-addr { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end; margin-top: 14px; }
+.srv-addr .field { margin: 0; }
+@media (max-width: 760px) { .srv-addr { grid-template-columns: 1fr; } }

@@ -180,6 +180,14 @@
             <span class="pill">Игроков: <b id="srvCount">—</b></span>
           </div>
           <p class="hint" id="srvError" hidden></p>
+          <form class="srv-addr" id="srvAddrForm">
+            <label class="field"><span>Адрес сервера CS2 <i class="h-hint">пусто — этот ПК</i></span>
+              <input id="srvHost" placeholder="например 192.168.0.50" autocomplete="off" spellcheck="false"></label>
+            <label class="field"><span>Пароль rcon <i class="h-hint" id="srvPwHint">пусто — из server.cfg</i></span>
+              <input type="password" id="srvRconPw" placeholder="не менять" autocomplete="new-password"></label>
+            <button type="submit" class="btn">Сохранить</button>
+          </form>
+          <p class="hint" id="srvHud"></p>
         </section>
 
         <section class="card">
