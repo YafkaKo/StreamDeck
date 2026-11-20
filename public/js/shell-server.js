@@ -159,7 +159,7 @@ function renderServer() {
   }
   document.querySelectorAll('#srvMaps .btn').forEach((b) => b.classList.toggle('is-current', b.dataset.map === s.map));
   document.querySelectorAll('[data-panel="server"] #srvMain button').forEach((b) => {
-    if (!b.closest('#srvCmdForm')) b.disabled = !s.online && !b.dataset.srvAct;
+    if (!b.closest('#srvCmdForm, #srvAddrForm')) b.disabled = !s.online && !b.dataset.srvAct;
   });
 
   if (document.activeElement !== $('srvAutoFinish')) $('srvAutoFinish').checked = !!s.settings.autoFinish;
